@@ -1,6 +1,6 @@
-# Argo CD Application on the hub: syncs the bundle CI publishes to
-# lmcdasm/dasmlab-live-cicd clusters/2026-prod-1/fleet-validator/live (hub Policy + Placement,
-# spoke probe Policy + Placement). ACM then rolls out the workload and dashboards.
+# Argo CD Application on 2026-prod-1: syncs the plain-manifest envelope CI publishes to
+# lmcdasm/dasmlab-live-cicd clusters/2026-prod-1/fleet-validator/live. Same pattern as rf2vc.
+# The ACM Policy bundle CI publishes next to it (../acm) is for ACM hubs and is not synced.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -20,10 +20,11 @@ spec:
       include: fleet-validator-v*.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: open-cluster-management-global-set
+    namespace: fleet-validator
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - PruneLast=true

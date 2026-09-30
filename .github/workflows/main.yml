@@ -184,18 +184,22 @@ jobs:
           DEPLOY_TOKEN="${DEPLOY_TOKEN:-${DASMLAB_GHCR_PAT:-}}"
           [ -n "${DEPLOY_TOKEN}" ] || { echo "ERROR: need /home/dasm/gh_token on the runner or secret DASMLAB_GHCR_PAT"; exit 1; }
 
-          IMAGE="${IMAGE_REPO}:${VERSION_TAG}" ./hack/render-bundle.sh > bundle.yaml
+          # live/: plain manifests Argo CD syncs (2026-prod-1 has no ACM).
+          # acm/:  the ACM Policy bundle pinned to the same image, for ACM hubs (not synced).
+          IMAGE="${IMAGE_REPO}:${VERSION_TAG}" ./hack/render-envelope.sh > envelope.yaml
+          IMAGE="${IMAGE_REPO}:${VERSION_TAG}" ./hack/render-bundle.sh > acm-bundle.yaml
 
           git clone "https://x-access-token:${DEPLOY_TOKEN}@github.com/lmcdasm/dasmlab-live-cicd.git"
           TARGET_CLUSTERS=("2026-prod-1")
           for CLUSTER_NAME in "${TARGET_CLUSTERS[@]}"; do
-            DEPLOY_DIR="dasmlab-live-cicd/clusters/${CLUSTER_NAME}/fleet-validator/live"
-            ARCHIVE_DIR="dasmlab-live-cicd/clusters/${CLUSTER_NAME}/fleet-validator/archived"
-            mkdir -p "${DEPLOY_DIR}" "${ARCHIVE_DIR}"
-            for old in "${DEPLOY_DIR}"/fleet-validator-v*.yaml; do
-              [ -e "${old}" ] && mv "${old}" "${ARCHIVE_DIR}/"
+            BASE="dasmlab-live-cicd/clusters/${CLUSTER_NAME}/fleet-validator"
+            mkdir -p "${BASE}/live" "${BASE}/archived" "${BASE}/acm"
+            for old in "${BASE}"/live/fleet-validator-v*.yaml; do
+              [ -e "${old}" ] && mv "${old}" "${BASE}/archived/"
             done
-            cp bundle.yaml "${DEPLOY_DIR}/fleet-validator-${VERSION_TAG}.yaml"
+            rm -f "${BASE}"/acm/fleet-validator-acm-v*.yaml
+            cp envelope.yaml "${BASE}/live/fleet-validator-${VERSION_TAG}.yaml"
+            cp acm-bundle.yaml "${BASE}/acm/fleet-validator-acm-${VERSION_TAG}.yaml"
           done
 
           cd dasmlab-live-cicd

@@ -139,18 +139,44 @@ overwrites `cluster` with the hub name (`local-cluster`) on everything it forwar
 
 When a cluster leaves the fleet (or gets the skip annotation), its series are removed.
 
-## Deploying (ACM policy, delivered by Argo CD)
+## Deploying
 
 ![fleet-validator deploy](diagrams/fleet-validator-deploy.svg)
 
 Every push to `main` runs the CI pipeline: vet and test, build the image and push it to
-`ghcr.io/dasmlab/fleet-validator`, then render the bundle and commit it to
+`ghcr.io/dasmlab/fleet-validator`, then publish two files to
 [`lmcdasm/dasmlab-live-cicd`](https://github.com/lmcdasm/dasmlab-live-cicd) under
-`clusters/2026-prod-1/fleet-validator/live/fleet-validator-<version>.yaml`. The previous bundle is
-moved to `archived/`. The Argo CD Application `fleet-validator` syncs that folder into
-`open-cluster-management-global-set`, and ACM does the rest.
+`clusters/2026-prod-1/fleet-validator/`, both pinned to the same image:
 
-The bundle (`hack/render-bundle.sh`) contains:
+| Path | What | Used by |
+|---|---|---|
+| `live/fleet-validator-<version>.yaml` | Plain manifests (`hack/render-envelope.sh`) | Argo CD on 2026-prod-1 |
+| `acm/fleet-validator-acm-<version>.yaml` | ACM Policy bundle (`hack/render-bundle.sh`) | ACM hubs (client systems); not synced |
+
+The previous `live/` file is moved to `archived/`.
+
+### 2026-prod-1 (CI target, no ACM)
+
+2026-prod-1 proves the pipeline end to end, the same way rf2vc is deployed. It has no ACM, so
+validation results there are mostly skip or fail. The envelope contains exactly the objects the
+hub policy would create, extracted from it by `hack/envelope`, minus the ACM Observability
+dashboards.
+
+One-time registration of the Argo CD Application (also kept in live-cicd under
+`clusters/2026-prod-1/argocd/applications/fleet-validator.yaml`):
+
+```bash
+OC_CONTEXT=<ctx> ./scripts/bootstrap-argocd.sh
+```
+
+### ACM hub (ConfigurationPolicy)
+
+On a real hub, apply the ACM bundle: the latest `acm/fleet-validator-acm-<version>.yaml` from
+live-cicd, or the files below, which are pinned to `v$(cat .localbuild)`. The policies live in
+`open-cluster-management-global-set`, whose binding to the `global` cluster set ACM creates by
+default.
+
+The bundle contains:
 
 | File | What |
 |---|---|
@@ -169,34 +195,20 @@ The hub policy has three ConfigurationPolicies:
    goes NonCompliant and only the two metric-based checks report skip.
 3. `hub-fleet-validator-dashboards`: the two Grafana dashboard ConfigMaps.
 
-### Hub prerequisites
+Hub prerequisites:
 
 ```bash
 oc get mch -A                                          # ACM installed
 oc get ns open-cluster-management-global-set           # created by ACM
-oc -n openshift-gitops get argocd                      # OpenShift GitOps
 oc -n openshift-monitoring get cm cluster-monitoring-config -o yaml | grep enableUserWorkload
 oc get multiclusterobservability                       # for the dashboards
 ```
 
-### One-time bootstrap
-
-Argo CD must already have access to `lmcdasm/dasmlab-live-cicd`. Then:
+Apply and check:
 
 ```bash
-OC_CONTEXT=<hub-context> ./scripts/bootstrap-argocd.sh
-```
-
-This applies `k8s_envelope/argocd-rbac.yaml` and `k8s_envelope/argocd-application.yaml`. To
-apply the bundle by hand instead, without Argo CD:
-
-```bash
-IMAGE=ghcr.io/dasmlab/fleet-validator:<tag> ./hack/render-bundle.sh | oc apply -f -
-```
-
-### Check it
-
-```bash
+oc apply -f fleet-validator-acm-<version>.yaml
+# or: IMAGE=ghcr.io/dasmlab/fleet-validator:<tag> ./hack/render-bundle.sh | oc apply -f -
 oc -n open-cluster-management-global-set get policy
 oc -n fleet-validator get pods,route
 oc -n fleet-validator logs deploy/fleet-validator -c validator --tail=20
@@ -267,8 +279,8 @@ internal/promq/          Thanos querier client
 internal/config/         config file and annotations
 deploy/acm/              hub policy (template + rendered), placement, spoke probe policy
 deploy/grafana/          dashboard JSON and ConfigMaps
-hack/                    dashboard generator and render scripts
-k8s_envelope/            Argo CD Application and RBAC
+hack/                    dashboard generator, render scripts, envelope extractor
+k8s_envelope/            Argo CD Application (2026-prod-1)
 scripts/                 Argo CD bootstrap, CI version resolver
 diagrams/                D2 sources and SVGs
 docs/                    checklist and design notes
