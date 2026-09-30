@@ -11,8 +11,9 @@ OC="oc${OC_CONTEXT:+ --context=${OC_CONTEXT}}"
 ${OC} whoami >/dev/null
 ${OC} get namespace openshift-gitops >/dev/null || { echo "OpenShift GitOps not installed"; exit 1; }
 
+${OC} apply -f "${ROOT}/k8s_envelope/argocd-rbac.yaml"
 ${OC} apply -f "${ROOT}/k8s_envelope/argocd-application.yaml"
 
 echo "Watch it:"
-echo "  ${OC} -n openshift-gitops get application fleet-validator"
+echo "  ${OC} -n openshift-gitops get applications.argoproj.io fleet-validator"
 echo "  ${OC} -n fleet-validator get pods,route"
