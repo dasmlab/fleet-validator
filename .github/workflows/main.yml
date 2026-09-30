@@ -1,0 +1,214 @@
+name: fleet-validator CX Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "SemVer bump on main (point every commit; minor/major when drawing a line)"
+        required: false
+        default: "point"
+        type: choice
+        options: [point, minor, major]
+
+concurrency:
+  group: fleet-validator-${{ github.ref == 'refs/heads/main' && 'prod' || format('branch-{0}', github.ref_name) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  IMAGE_REPO: ghcr.io/dasmlab/fleet-validator
+  GO_VERSION: "1.24"
+
+jobs:
+  prepare:
+    runs-on: [self-hosted]
+    permissions:
+      contents: write
+    outputs:
+      version_tag: ${{ steps.claim.outputs.version_tag || steps.meta.outputs.version_tag }}
+      semver: ${{ steps.claim.outputs.semver || steps.meta.outputs.semver }}
+      git_tag: ${{ steps.claim.outputs.git_tag || steps.meta.outputs.git_tag }}
+      is_prod: ${{ steps.meta.outputs.is_prod }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ci/resolve-version.sh
+          if git log -1 --pretty=%B | grep -qi '\[skip ci\]'; then
+            echo "Skipping: commit marked [skip ci]"
+            { echo "version_tag=skip"; echo "semver=skip"; echo "git_tag=skip"; echo "is_prod=false"; echo "create_git_tag=false"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          IS_PROD=false
+          BUMP=0
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            IS_PROD=true
+            BUMP=1
+          fi
+          BUMP="${BUMP}" BUMP_KIND="${{ github.event.inputs.bump || 'point' }}" SHA="$(git rev-parse --short HEAD)" \
+            ./scripts/ci/resolve-version.sh
+          echo "is_prod=${IS_PROD}" >> "$GITHUB_OUTPUT"
+          if [ "${IS_PROD}" != "true" ]; then
+            echo "create_git_tag=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Claim the SemVer via a git tag (retry on races with other pushes).
+      - name: Claim SemVer tag
+        id: claim
+        if: steps.meta.outputs.is_prod == 'true' && steps.meta.outputs.create_git_tag == 'true' && steps.meta.outputs.version_tag != 'skip'
+        env:
+          BUMP_KIND: ${{ github.event.inputs.bump || 'point' }}
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse --short HEAD)"
+          git config user.name "dasmlab-bot"
+          git config user.email "ci@dasmlab.org"
+          claimed=""
+          for attempt in 1 2 3 4 5 6 7 8; do
+            git fetch --tags origin
+            BUMP=1 BUMP_KIND="${BUMP_KIND}" SHA="${SHA}" ./scripts/ci/resolve-version.sh | tee /tmp/fv-ver.out
+            SEMVER="$(awk -F= '/^semver=/{print $2}' /tmp/fv-ver.out | tail -1)"
+            GIT_TAG="$(awk -F= '/^git_tag=/{print $2}' /tmp/fv-ver.out | tail -1)"
+            VERSION_TAG="$(awk -F= '/^version_tag=/{print $2}' /tmp/fv-ver.out | tail -1)"
+            if git ls-remote --tags origin "refs/tags/${GIT_TAG}" | grep -q .; then
+              echo "Tag ${GIT_TAG} already on origin (attempt ${attempt}); retry"
+              continue
+            fi
+            git tag -f -a "${GIT_TAG}" -m "fleet-validator ${GIT_TAG} (${VERSION_TAG})"
+            if git push origin "refs/tags/${GIT_TAG}"; then
+              claimed=1
+              { echo "semver=${SEMVER}"; echo "git_tag=${GIT_TAG}"; echo "version_tag=${VERSION_TAG}"; } >> "$GITHUB_OUTPUT"
+              echo "Claimed ${GIT_TAG} for ${VERSION_TAG}"
+              break
+            fi
+            git tag -d "${GIT_TAG}" 2>/dev/null || true
+            sleep 1
+          done
+          [ -n "${claimed}" ] || { echo "ERROR: could not claim a SemVer tag"; exit 1; }
+
+  test:
+    needs: prepare
+    if: needs.prepare.outputs.version_tag != 'skip'
+    runs-on: [self-hosted]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Go vet + test
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Rendered policy is up to date
+        run: |
+          set -euo pipefail
+          python3 hack/gen-dashboards.py
+          ./hack/render-grafana-configmap.sh
+          VERSION="v$(tr -d '[:space:]' < .localbuild)" ./hack/render-acm-policy.sh
+          git diff --exit-code -- deploy/grafana || { echo "run: make render"; exit 1; }
+
+  build-publish:
+    needs: [prepare, test]
+    if: needs.prepare.outputs.version_tag != 'skip'
+    runs-on: [self-hosted]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and push image
+        env:
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+          SEMVER: ${{ needs.prepare.outputs.semver }}
+          GIT_TAG: ${{ needs.prepare.outputs.git_tag }}
+          IS_PROD: ${{ needs.prepare.outputs.is_prod }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          # Always: immutable build id vX.Y.Z-<sha>. On main also vX.Y.Z, X.Y.Z and latest.
+          TAGS=("${IMAGE_REPO}:${VERSION_TAG}")
+          if [ "${IS_PROD}" = "true" ]; then
+            TAGS+=("${IMAGE_REPO}:${GIT_TAG}" "${IMAGE_REPO}:${SEMVER}" "${IMAGE_REPO}:latest")
+          fi
+          TAG_ARGS=()
+          for t in "${TAGS[@]}"; do TAG_ARGS+=(-t "${t}"); done
+          if command -v buildah >/dev/null 2>&1; then
+            TOOL=buildah
+            buildah bud --build-arg VERSION="${VERSION_TAG}" "${TAG_ARGS[@]}" .
+            echo "${GHCR_TOKEN}" | buildah login -u "${GHCR_USER}" --password-stdin ghcr.io
+          else
+            TOOL=docker
+            docker build --build-arg VERSION="${VERSION_TAG}" "${TAG_ARGS[@]}" .
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          fi
+          for t in "${TAGS[@]}"; do ${TOOL} push "${t}"; done
+          echo "Published: ${TAGS[*]}"
+
+      - name: Smoke test
+        env:
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+        run: |
+          set -euo pipefail
+          RUNNER=docker
+          command -v docker >/dev/null 2>&1 || RUNNER=podman
+          ${RUNNER} run --rm "${IMAGE_REPO}:${VERSION_TAG}" --print-metric-names | grep -q fleetvalidator_cluster_score
+
+  gitops-deploy:
+    needs: [prepare, build-publish]
+    if: success() && needs.prepare.outputs.is_prod == 'true'
+    runs-on: [self-hosted]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: GitOps publish (dasmlab-live-cicd)
+        env:
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+          DASMLAB_GHCR_PAT: ${{ secrets.DASMLAB_GHCR_PAT }}
+        run: |
+          set -euo pipefail
+          DEPLOY_TOKEN=""
+          for f in /home/dasm/gh_token "$HOME/gh_token"; do
+            if [ -f "$f" ]; then DEPLOY_TOKEN="$(tr -d '\n\r' < "$f")"; [ -n "${DEPLOY_TOKEN}" ] && break; fi
+          done
+          DEPLOY_TOKEN="${DEPLOY_TOKEN:-${DASMLAB_GHCR_PAT:-}}"
+          [ -n "${DEPLOY_TOKEN}" ] || { echo "ERROR: need /home/dasm/gh_token on the runner or secret DASMLAB_GHCR_PAT"; exit 1; }
+
+          IMAGE="${IMAGE_REPO}:${VERSION_TAG}" ./hack/render-bundle.sh > bundle.yaml
+
+          git clone "https://x-access-token:${DEPLOY_TOKEN}@github.com/lmcdasm/dasmlab-live-cicd.git"
+          TARGET_CLUSTERS=("2026-prod-1")
+          for CLUSTER_NAME in "${TARGET_CLUSTERS[@]}"; do
+            DEPLOY_DIR="dasmlab-live-cicd/clusters/${CLUSTER_NAME}/fleet-validator/live"
+            ARCHIVE_DIR="dasmlab-live-cicd/clusters/${CLUSTER_NAME}/fleet-validator/archived"
+            mkdir -p "${DEPLOY_DIR}" "${ARCHIVE_DIR}"
+            for old in "${DEPLOY_DIR}"/fleet-validator-v*.yaml; do
+              [ -e "${old}" ] && mv "${old}" "${ARCHIVE_DIR}/"
+            done
+            cp bundle.yaml "${DEPLOY_DIR}/fleet-validator-${VERSION_TAG}.yaml"
+          done
+
+          cd dasmlab-live-cicd
+          git config user.name "dasmlab-bot"
+          git config user.email "ci@dasmlab.org"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No GitOps changes"
+            exit 0
+          fi
+          git commit -m "Auto-publish fleet-validator ${VERSION_TAG}"
+          for attempt in 1 2 3 4 5; do
+            git push && exit 0
+            git pull --rebase
+          done
+          exit 1

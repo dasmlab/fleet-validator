@@ -1,0 +1,44 @@
+direction: right
+
+spoke: {
+  label: "Managed cluster"
+  style.fill: "#F7F8FB"
+  io: {
+    label: "Insights Operator\n(built into OpenShift)"
+    style.fill: "#EEF1F8"
+  }
+}
+crc: {
+  label: "console.redhat.com\nInsights Advisor\n(rules → recommendations)"
+  style.fill: "#EEF1F8"
+}
+hub: {
+  label: "ACM hub"
+  style.fill: "#F7F8FB"
+  client: {
+    label: "insights-client\n(open-cluster-management)"
+    style.fill: "#EEF1F8"
+  }
+  pr: {
+    label: "PolicyReport per cluster\n(cluster namespace)"
+    style.fill: "#E8F2F0"
+  }
+  console: {
+    label: "ACM console\n\"Powered by Insights\""
+    style.fill: "#E8F2F0"
+  }
+  fv: {
+    label: "fleet-validator\nInsights section (idea)"
+    style.fill: "#1f6f62"
+    style.font-color: "#FFFFFF"
+    style.bold: true
+  }
+  client -> pr: "write"
+  pr -> console
+  pr -> fv: "read (future)" {
+    style.stroke-dash: 3
+  }
+}
+
+spoke.io -> crc: "anonymized\ncluster data"
+hub.client -> crc: "fetch recommendations\nper cluster ID"

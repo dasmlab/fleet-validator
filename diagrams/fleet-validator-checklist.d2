@@ -1,0 +1,28 @@
+direction: down
+
+hub: {
+  label: "ACM Hub Validation (local-cluster)"
+  style.fill: "#F7F8FB"
+  grid-columns: 4
+  platform: "Platform\nClusterVersion · COs · MCPs\nnodes · CSRs · etcd · API p99"
+  acm: "ACM Hub\nMCH phase + components\nMCE · CSV · pods"
+  backup: "Backup & DR\ncluster-backup · OADP · BSL\nschedule · last backup · policy"
+  obs: "Observability\nMCO Ready · pods · UWM"
+  gov: "Governance\nOperatorPolicies ≥ N\nConfigurationPolicies ≥ N\nall Compliant · root placement"
+  gitops: "GitOps\nArgo CD · apps Synced\napps Healthy · GitOpsCluster"
+  fleet: "Fleet\nclusters Available / joined\nlocal add-ons · fleet compliance"
+}
+
+managed: {
+  label: "Managed Cluster Validation (per cluster)"
+  style.fill: "#F7F8FB"
+  grid-columns: 4
+  reg: "Registration\naccepted · joined · available\nimport · clock · lease"
+  agents: "Agents & Add-ons\nrequired add-ons · Available\nklusterlet (probe)"
+  platform: "Platform\nversion · nodes (ManagedClusterInfo)\nCOs · MCPs · CSRs · etcd (probes)"
+  gov: "Governance\nOperatorPolicies ≥ N\nConfigurationPolicies ≥ N\nall Compliant"
+}
+
+hub -> managed: "same score model:\ncritical 5 · warning 2 · info 1\npass 100% · warn 50% · fail 0 · skip n/a" {
+  style.stroke-dash: 3
+}

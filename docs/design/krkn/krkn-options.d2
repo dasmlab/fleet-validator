@@ -1,0 +1,38 @@
+direction: right
+
+fv: {
+  label: "fleet-validator\n(hub)"
+  style.fill: "#1f6f62"
+  style.font-color: "#FFFFFF"
+  style.bold: true
+}
+
+a: {
+  label: "A · Observe\nread Krkn Operator results\n→ Resilience section"
+  style.fill: "#E8F2F0"
+}
+b: {
+  label: "B · Orchestrate\nResilienceTest CR\n→ Krkn Operator runs it"
+  style.fill: "#EEF1F8"
+}
+c: {
+  label: "C · Self-run\nManifestWork Job\n(krkn-hub image) on the spoke"
+  style.fill: "#F7F8FB"
+}
+
+krkn: {
+  label: "Krkn Operator\n(hub, ACM integration)\nChaos Studio · resiliency score"
+  style.fill: "#EEF1F8"
+}
+spokes: {
+  label: "Managed clusters\n(non-prod first)"
+  style.fill: "#EEF1F8"
+}
+
+fv -> a
+fv -> b
+fv -> c
+a -> krkn: "read jobs / scores"
+b -> krkn: "start workflow\nwatch result"
+krkn -> spokes: "inject scenarios"
+c -> spokes: "Job per scenario"

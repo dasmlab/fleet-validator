@@ -1,0 +1,11 @@
+bin/
+dist/
+*.out
+coverage.html
+coverage.txt
+.idea/
+.vscode/
+*.swp
+.DS_Store
+__pycache__/
+HANDOFF.md

@@ -1,0 +1,17 @@
+shape: sequence_diagram
+
+user: "Platform team\n(Git / Argo CD)"
+fv: "fleet-validator\ncontroller"
+krkn: "Krkn Operator"
+spoke: "Target cluster"
+prom: "Prometheus / Thanos"
+
+user -> fv: "apply ResilienceTest\n(spec.testName, clusterSelector, schedule)"
+fv -> fv: "select clusters\n(Placement / labels)"
+fv -> fv: "readiness gate:\nscore ≥ minScore and READY"
+fv -> krkn: "start workflow testName\non cluster X"
+krkn -> spoke: "inject scenarios\n(pod kill, network, node, ...)"
+fv -> prom: "watch SLOs during run\n(abort threshold)"
+krkn -> fv: "result + resiliency score"
+fv -> fv: "compare with baseline\nstatus.results[]"
+fv -> prom: "fleetvalidator_resilience_score\n(Resilience section)"

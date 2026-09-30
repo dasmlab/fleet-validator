@@ -1,0 +1,39 @@
+direction: right
+
+gh: {
+  label: "GitHub Actions\n(self-hosted runners)"
+  style.fill: "#EEF1F8"
+}
+ghcr: {
+  label: "ghcr.io/dasmlab/fleet-validator\n(public)"
+  style.fill: "#EEF1F8"
+}
+live: {
+  label: "dasmlab-live-cicd\nclusters/2026-prod-1/fleet-validator/live"
+  style.fill: "#EEF1F8"
+}
+argo: {
+  label: "Argo CD\nApplication fleet-validator"
+  style.fill: "#E8F2F0"
+}
+policy: {
+  label: "ACM Policies\nopen-cluster-management-global-set"
+  style.fill: "#1f6f62"
+  style.font-color: "#FFFFFF"
+  style.bold: true
+}
+hubwl: {
+  label: "hub-fleet-validator → local-cluster\nNS · RBAC · Deployment · Service · Route\nServiceMonitor · allowlist · 2 dashboards"
+  style.fill: "#E8F2F0"
+}
+probes: {
+  label: "fleet-validator-spoke-probes\n→ every OpenShift managed cluster"
+  style.fill: "#E8F2F0"
+}
+
+gh -> ghcr: "image vX.Y.Z-sha"
+gh -> live: "bundle vX.Y.Z-sha.yaml"
+live -> argo: "sync"
+argo -> policy: "Policy + Placement"
+policy -> hubwl: "enforce"
+policy -> probes: "inform"

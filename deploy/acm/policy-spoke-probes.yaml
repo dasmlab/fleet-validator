@@ -1,0 +1,226 @@
+# fleet-validator spoke probes — inform only, never changes anything on the spoke.
+#
+# Each ConfigurationPolicy below is one Platform/Agents check that can only be evaluated on
+# the managed cluster itself (ClusterOperators, MachineConfigPools, CSRs, etcd, klusterlet).
+# The config-policy-controller on the spoke evaluates it; fleet-validator on the hub reads the
+# per-template result from the replicated policy
+#   <cluster-ns>/open-cluster-management-global-set.fleet-validator-spoke-probes
+# ConfigurationPolicy names must match the Probe* constants in internal/checks/catalog.go.
+#
+# Placement: every OpenShift ManagedCluster except the hub (the hub is checked directly).
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: fleet-validator-spoke-probes
+  namespace: open-cluster-management-global-set
+  annotations:
+    policy.open-cluster-management.io/categories: CA Security Assessment and Authorization
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/controls: CA-7 Continuous Monitoring
+    policy.open-cluster-management.io/description: "Read-only readiness probes for fleet-validator: ClusterOperators, MCPs, CSRs, etcd, klusterlet."
+spec:
+  remediationAction: inform
+  copyPolicyMetadata: false
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-clusteroperators-available
+        spec:
+          remediationAction: inform
+          severity: high
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates:
+            - complianceType: mustnothave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: config.openshift.io/v1
+                kind: ClusterOperator
+                status:
+                  conditions:
+                    - type: Available
+                      status: "False"
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-clusteroperators-not-degraded
+        spec:
+          remediationAction: inform
+          severity: high
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates:
+            - complianceType: mustnothave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: config.openshift.io/v1
+                kind: ClusterOperator
+                status:
+                  conditions:
+                    - type: Degraded
+                      status: "True"
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-mcp-not-degraded
+        spec:
+          remediationAction: inform
+          severity: high
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates:
+            - complianceType: mustnothave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: machineconfiguration.openshift.io/v1
+                kind: MachineConfigPool
+                status:
+                  conditions:
+                    - type: Degraded
+                      status: "True"
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-mcp-updated
+        spec:
+          remediationAction: inform
+          severity: medium
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates:
+            - complianceType: mustnothave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: machineconfiguration.openshift.io/v1
+                kind: MachineConfigPool
+                status:
+                  conditions:
+                    - type: Updated
+                      status: "False"
+
+    # A CSR is pending while it has no Approved/Denied condition. The Namespace anchor keeps
+    # the template list non-empty when there is nothing pending.
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-no-pending-csr
+        spec:
+          remediationAction: inform
+          severity: medium
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates-raw: |
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: openshift-cluster-machine-approver
+            {{- range $csr := (lookup "certificates.k8s.io/v1" "CertificateSigningRequest" "" "").items }}
+            {{- if not $csr.status.conditions }}
+            - complianceType: mustnothave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: certificates.k8s.io/v1
+                kind: CertificateSigningRequest
+                metadata:
+                  name: {{ $csr.metadata.name }}
+            {{- end }}
+            {{- end }}
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-etcd-members
+        spec:
+          remediationAction: inform
+          severity: high
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates:
+            - complianceType: musthave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: operator.openshift.io/v1
+                kind: Etcd
+                metadata:
+                  name: cluster
+                status:
+                  conditions:
+                    - type: EtcdMembersAvailable
+                      status: "True"
+
+    # Every Deployment in open-cluster-management-agent (klusterlet-agent in Singleton mode,
+    # or registration + work agents in Default mode) must have all replicas ready.
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: fv-probe-klusterlet-agent
+        spec:
+          remediationAction: inform
+          severity: high
+          evaluationInterval: {compliant: 2m, noncompliant: 1m}
+          object-templates-raw: |
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: open-cluster-management-agent
+            {{- range $d := (lookup "apps/v1" "Deployment" "open-cluster-management-agent" "").items }}
+            - complianceType: musthave
+              recordDiff: None
+              objectDefinition:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: {{ $d.metadata.name }}
+                  namespace: open-cluster-management-agent
+                status:
+                  readyReplicas: {{ $d.spec.replicas }}
+            {{- end }}
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-fleet-validator-spoke-probes
+  namespace: open-cluster-management-global-set
+spec:
+  clusterSets:
+    - global
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchExpressions:
+            - key: local-cluster
+              operator: NotIn
+              values: ["true"]
+            - key: vendor
+              operator: In
+              values: ["OpenShift"]
+  # Keep the decision (and the last probe results) while a cluster flaps.
+  tolerations:
+    - key: cluster.open-cluster-management.io/unreachable
+      operator: Exists
+    - key: cluster.open-cluster-management.io/unavailable
+      operator: Exists
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-fleet-validator-spoke-probes
+  namespace: open-cluster-management-global-set
+placementRef:
+  name: placement-fleet-validator-spoke-probes
+  kind: Placement
+  apiGroup: cluster.open-cluster-management.io
+subjects:
+  - name: fleet-validator-spoke-probes
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io

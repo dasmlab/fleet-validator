@@ -1,0 +1,49 @@
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - dupl
+    - errcheck
+    - goconst
+    - gocyclo
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    lll:
+      line-length: 160
+    revive:
+      rules:
+        - name: comment-spacings
+        - name: import-shadowing
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - dupl
+          - lll
+          - goconst
+        path: _test\.go
+      - linters:
+          - lll
+          - prealloc
+        path: internal/checks/(catalog|kube)\.go
+      # Kubernetes condition/status literals ("True", "Compliant", ...) read better inline.
+      - linters:
+          - goconst
+        path: internal/checks/
+formatters:
+  enable:
+    - gofmt
+    - goimports

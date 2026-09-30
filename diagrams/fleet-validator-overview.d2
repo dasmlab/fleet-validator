@@ -1,0 +1,61 @@
+direction: right
+
+hub: {
+  label: "ACM hub (local-cluster)"
+  style.fill: "#F7F8FB"
+
+  fv: {
+    label: "fleet-validator\n(every 1m per cluster)"
+    style.fill: "#1f6f62"
+    style.font-color: "#FFFFFF"
+    style.bold: true
+  }
+  hubapi: {
+    label: "Hub APIs\nMCH · MCE · OADP · MCO\nClusterOperators · etcd · Argo CD"
+    style.fill: "#EEF1F8"
+  }
+  views: {
+    label: "Hub view of each spoke\nManagedCluster · lease · add-ons\nManagedClusterInfo · replicated Policies"
+    style.fill: "#EEF1F8"
+  }
+  thanosq: {
+    label: "Thanos querier\n(etcd DB, API p99)"
+    style.fill: "#EEF1F8"
+  }
+  uwm: {
+    label: "UWM Prometheus\n(ServiceMonitor)"
+    style.fill: "#E8F2F0"
+  }
+  grafana: {
+    label: "ACM Observability Grafana\nFleet-validator folder"
+    style.fill: "#E8F2F0"
+  }
+  ui: {
+    label: "Route + oauth-proxy\nchecklist UI / JSON"
+    style.fill: "#E8F2F0"
+  }
+
+  fv -> hubapi: "hub checks"
+  fv -> views: "managed checks"
+  fv -> thanosq: "PromQL"
+  fv -> uwm: "/metrics"
+  uwm -> grafana: "MCO collector\n→ hub Thanos"
+  ui -> fv: "127.0.0.1:8091"
+}
+
+spoke: {
+  label: "Managed cluster (mo-lab, ag-prod, …)"
+  style.fill: "#F7F8FB"
+
+  cpc: {
+    label: "config-policy-controller\nfleet-validator-spoke-probes\n(inform only)"
+    style.fill: "#EEF1F8"
+  }
+  ocp: {
+    label: "ClusterOperators · MCPs\nCSRs · etcd · klusterlet"
+    style.fill: "#EEF1F8"
+  }
+  cpc -> ocp: "evaluate"
+}
+
+spoke.cpc -> hub.views: "compliance per probe\n(policy status sync)"

@@ -1,0 +1,29 @@
+# Argo CD Application on the hub: syncs the bundle CI publishes to
+# lmcdasm/dasmlab-live-cicd clusters/2026-prod-1/fleet-validator/live (hub Policy + Placement,
+# spoke probe Policy + Placement). ACM then rolls out the workload and dashboards.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleet-validator
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: fleet-validator
+    dasmlab.org/cluster: 2026-prod-1
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:lmcdasm/dasmlab-live-cicd.git
+    targetRevision: main
+    path: clusters/2026-prod-1/fleet-validator/live
+    directory:
+      recurse: false
+      include: fleet-validator-v*.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: open-cluster-management-global-set
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - PruneLast=true
