@@ -19,7 +19,7 @@ func (t *Target) boundPolicies(ctx context.Context) ([]unstructured.Unstructured
 	out := make([]unstructured.Unstructured, 0, len(items))
 	for _, p := range items {
 		root, ok := p.GetLabels()[labelRootPolicy]
-		if ok && root != t.Env.Cfg.ProbePolicy {
+		if ok && !t.Env.Cfg.IsProbePolicy(root) {
 			out = append(out, p)
 		}
 	}

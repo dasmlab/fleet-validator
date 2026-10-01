@@ -377,7 +377,7 @@ func checkFleetCompliance(ctx context.Context, t *Target) (State, string) {
 	total := 0
 	for _, p := range all {
 		root, replicated := p.GetLabels()[labelRootPolicy]
-		if !replicated || root == t.Env.Cfg.ProbePolicy {
+		if !replicated || t.Env.Cfg.IsProbePolicy(root) {
 			continue
 		}
 		total++

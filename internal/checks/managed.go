@@ -147,14 +147,19 @@ func checkSpokeNodes(ctx context.Context, t *Target) (State, string) {
 // probe reads one ConfigurationPolicy result out of the replicated probe policy.
 func probe(template string) func(context.Context, *Target) (State, string) {
 	return func(ctx context.Context, t *Target) (State, string) {
-		root := t.Env.Cfg.ProbePolicy
-		p, err := t.get(ctx, gvrPolicy, t.Name, root)
+		items, err := t.list(ctx, gvrPolicy, t.Name)
 		if err != nil {
-			st, d := skipOrFail(err, "probe policy")
-			if st == Fail {
-				return Skip, "probe policy " + root + " not placed on this cluster"
+			return skipOrFail(err, "probe policy")
+		}
+		var p *unstructured.Unstructured
+		for i := range items {
+			if t.Env.Cfg.IsProbePolicy(items[i].GetLabels()[labelRootPolicy]) {
+				p = &items[i]
+				break
 			}
-			return st, d
+		}
+		if p == nil {
+			return Skip, "probe policy " + t.Env.Cfg.ProbePolicy + " not placed on this cluster"
 		}
 		details, _, _ := unstructured.NestedSlice(p.Object, "status", "details")
 		for _, raw := range details {

@@ -19,7 +19,7 @@ func TestProbePolicyNames(t *testing.T) {
 			t.Errorf("probe %s missing from policy-spoke-probes.yaml", name)
 		}
 	}
-	if !strings.Contains(string(b), "name: fleet-validator-spoke-probes\n  namespace: open-cluster-management-global-set") {
-		t.Error("probe policy name/namespace no longer matches config.ProbePolicy default")
+	if !strings.Contains(string(b), "kind: Policy\nmetadata:\n  name: fleet-validator-spoke-probes\n") {
+		t.Error("probe policy name no longer matches config.ProbePolicy default")
 	}
 }

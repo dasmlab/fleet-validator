@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"sigs.k8s.io/yaml"
@@ -51,7 +52,8 @@ type Config struct {
 	HubNamespace           string `json:"hubNamespace"`
 	BackupNamespace        string `json:"backupNamespace"`
 	ObservabilityNamespace string `json:"observabilityNamespace"`
-	// ProbePolicy is the root policy (namespace.name) that runs the spoke probes.
+	// ProbePolicy is the root policy that runs the spoke probes: a name (any namespace) or
+	// namespace.name.
 	ProbePolicy    string     `json:"probePolicy"`
 	RequiredAddons []string   `json:"requiredAddons"`
 	Governance     Governance `json:"governance"`
@@ -72,7 +74,7 @@ func Default() *Config {
 		HubNamespace:           "open-cluster-management",
 		BackupNamespace:        "open-cluster-management-backup",
 		ObservabilityNamespace: "open-cluster-management-observability",
-		ProbePolicy:            "open-cluster-management-global-set.fleet-validator-spoke-probes",
+		ProbePolicy:            "fleet-validator-spoke-probes",
 		RequiredAddons:         []string{"work-manager", "governance-policy-framework", "config-policy-controller"},
 		Governance: Governance{
 			Default: GovernanceThresholds{MinOperatorPolicies: 1, MinConfigurationPolicies: 1},
@@ -128,6 +130,16 @@ func (c *Config) IntervalDuration() time.Duration { return c.interval }
 
 // Disabled reports whether a check id is switched off.
 func (c *Config) Disabled(id string) bool { return c.disabled[id] }
+
+// IsProbePolicy reports whether root (a replicated policy's root-policy label, namespace.name)
+// is the probe policy.
+func (c *Config) IsProbePolicy(root string) bool {
+	if strings.Contains(c.ProbePolicy, ".") {
+		return root == c.ProbePolicy
+	}
+	_, name, ok := strings.Cut(root, ".")
+	return ok && name == c.ProbePolicy
+}
 
 // GovernanceFor resolves thresholds: default, then the per-cluster entry, then annotations.
 func (c *Config) GovernanceFor(cluster string, annotations map[string]string) GovernanceThresholds {

@@ -46,6 +46,24 @@ disabledChecks: [hub.backup.recent]
 	}
 }
 
+func TestIsProbePolicy(t *testing.T) {
+	c := Default()
+	for root, want := range map[string]bool{
+		"open-cluster-management.fleet-validator-spoke-probes":            true,
+		"open-cluster-management-global-set.fleet-validator-spoke-probes": true,
+		"open-cluster-management.hub-fleet-validator":                     false,
+		"fleet-validator-spoke-probes":                                    false,
+	} {
+		if got := c.IsProbePolicy(root); got != want {
+			t.Errorf("default %q: got %v", root, got)
+		}
+	}
+	c.ProbePolicy = "policies.fleet-validator-spoke-probes"
+	if c.IsProbePolicy("open-cluster-management.fleet-validator-spoke-probes") || !c.IsProbePolicy(c.ProbePolicy) {
+		t.Error("namespace.name must match exactly")
+	}
+}
+
 func TestIntervalFloor(t *testing.T) {
 	c := Default()
 	c.Interval = "1s"

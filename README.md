@@ -52,6 +52,7 @@ passed with `--config`; the values below are the defaults.
 interval: 1m                 # time between validations of the same cluster (min 10s)
 concurrency: 4               # clusters validated at the same time
 hubName: local-cluster       # used when the hub has no local-cluster ManagedCluster
+probePolicy: fleet-validator-spoke-probes   # probe Policy name (any namespace), or namespace.name
 requiredAddons:
   - work-manager
   - governance-policy-framework
