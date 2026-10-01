@@ -221,7 +221,7 @@ spec:
                           type: RuntimeDefault
                       containers:
                         - name: validator
-                          image: ghcr.io/dasmlab/fleet-validator:v0.1.1
+                          image: ghcr.io/dasmlab/fleet-validator:v0.1.4
                           imagePullPolicy: IfNotPresent
                           args:
                             - --config=/etc/fleet-validator/config.yaml

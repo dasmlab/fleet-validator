@@ -112,7 +112,7 @@ jobs:
           python3 hack/gen-dashboards.py
           ./hack/render-grafana-configmap.sh
           VERSION="v$(tr -d '[:space:]' < .localbuild)" ./hack/render-acm-policy.sh
-          git diff --exit-code -- deploy/grafana || { echo "run: make render"; exit 1; }
+          git diff --exit-code -- deploy || { echo "run: make render"; exit 1; }
 
   build-publish:
     needs: [prepare, test]
@@ -184,22 +184,19 @@ jobs:
           DEPLOY_TOKEN="${DEPLOY_TOKEN:-${DASMLAB_GHCR_PAT:-}}"
           [ -n "${DEPLOY_TOKEN}" ] || { echo "ERROR: need /home/dasm/gh_token on the runner or secret DASMLAB_GHCR_PAT"; exit 1; }
 
-          # live/: plain manifests Argo CD syncs (2026-prod-1 has no ACM).
-          # acm/:  the ACM Policy bundle pinned to the same image, for ACM hubs (not synced).
+          # Plain manifests for Argo CD (2026-prod-1 has no ACM). The ACM policy lives in deploy/acm.
           IMAGE="${IMAGE_REPO}:${VERSION_TAG}" ./hack/render-envelope.sh > envelope.yaml
-          IMAGE="${IMAGE_REPO}:${VERSION_TAG}" ./hack/render-bundle.sh > acm-bundle.yaml
 
           git clone "https://x-access-token:${DEPLOY_TOKEN}@github.com/lmcdasm/dasmlab-live-cicd.git"
           TARGET_CLUSTERS=("2026-prod-1")
           for CLUSTER_NAME in "${TARGET_CLUSTERS[@]}"; do
             BASE="dasmlab-live-cicd/clusters/${CLUSTER_NAME}/fleet-validator"
-            mkdir -p "${BASE}/live" "${BASE}/archived" "${BASE}/acm"
+            mkdir -p "${BASE}/live" "${BASE}/archived"
             for old in "${BASE}"/live/fleet-validator-v*.yaml; do
               [ -e "${old}" ] && mv "${old}" "${BASE}/archived/"
             done
-            rm -f "${BASE}"/acm/fleet-validator-acm-v*.yaml
+            rm -rf "${BASE}/acm"
             cp envelope.yaml "${BASE}/live/fleet-validator-${VERSION_TAG}.yaml"
-            cp acm-bundle.yaml "${BASE}/acm/fleet-validator-acm-${VERSION_TAG}.yaml"
           done
 
           cd dasmlab-live-cicd

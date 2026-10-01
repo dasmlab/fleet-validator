@@ -60,6 +60,6 @@ fi
 
 git commit -m "${MSG}"
 git tag -a "${NEW_TAG}" -m "${MSG}"
-git push origin "${BRANCH}"
-git push origin "${NEW_TAG}"
+# Atomic: CI must see the tag on HEAD, or it bumps and claims a version of its own.
+git push --atomic origin "${BRANCH}" "${NEW_TAG}"
 echo "Done: ${NEW_TAG} on ${BRANCH}"

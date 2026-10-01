@@ -139,44 +139,12 @@ overwrites `cluster` with the hub name (`local-cluster`) on everything it forwar
 
 When a cluster leaves the fleet (or gets the skip annotation), its series are removed.
 
-## Deploying
+## Deploying on the ACM hub (ConfigurationPolicy)
 
-![fleet-validator deploy](diagrams/fleet-validator-deploy.svg)
-
-Every push to `main` runs the CI pipeline: vet and test, build the image and push it to
-`ghcr.io/dasmlab/fleet-validator`, then publish two files to
-[`lmcdasm/dasmlab-live-cicd`](https://github.com/lmcdasm/dasmlab-live-cicd) under
-`clusters/2026-prod-1/fleet-validator/`, both pinned to the same image:
-
-| Path | What | Used by |
-|---|---|---|
-| `live/fleet-validator-<version>.yaml` | Plain manifests (`hack/render-envelope.sh`) | Argo CD on 2026-prod-1 |
-| `acm/fleet-validator-acm-<version>.yaml` | ACM Policy bundle (`hack/render-bundle.sh`) | ACM hubs (client systems); not synced |
-
-The previous `live/` file is moved to `archived/`.
-
-### 2026-prod-1 (CI target, no ACM)
-
-2026-prod-1 proves the pipeline end to end, the same way rf2vc is deployed. It has no ACM, so
-validation results there are mostly skip or fail. The envelope contains exactly the objects the
-hub policy would create, extracted from it by `hack/envelope`, minus the ACM Observability
-dashboards.
-
-One-time registration of the Argo CD Application (also kept in live-cicd under
-`clusters/2026-prod-1/argocd/applications/fleet-validator.yaml`):
-
-```bash
-OC_CONTEXT=<ctx> ./scripts/bootstrap-argocd.sh
-```
-
-### ACM hub (ConfigurationPolicy)
-
-On a real hub, apply the ACM bundle: the latest `acm/fleet-validator-acm-<version>.yaml` from
-live-cicd, or the files below, which are pinned to `v$(cat .localbuild)`. The policies live in
+Everything needed is in `deploy/acm/`. The rendered policy is pinned to the release in
+`.localbuild`; `./commitme.sh` re-renders it whenever it cuts a tag. The policies live in
 `open-cluster-management-global-set`, whose binding to the `global` cluster set ACM creates by
 default.
-
-The bundle contains:
 
 | File | What |
 |---|---|
@@ -204,14 +172,35 @@ oc -n openshift-monitoring get cm cluster-monitoring-config -o yaml | grep enabl
 oc get multiclusterobservability                       # for the dashboards
 ```
 
-Apply and check:
+Apply (or add the three files to the hub's GitOps folder) and check:
 
 ```bash
-oc apply -f fleet-validator-acm-<version>.yaml
-# or: IMAGE=ghcr.io/dasmlab/fleet-validator:<tag> ./hack/render-bundle.sh | oc apply -f -
+oc apply -f deploy/acm/policy-hub-fleet-validator.yaml \
+         -f deploy/acm/placement-hub-fleet-validator.yaml \
+         -f deploy/acm/policy-spoke-probes.yaml
 oc -n open-cluster-management-global-set get policy
 oc -n fleet-validator get pods,route
 oc -n fleet-validator logs deploy/fleet-validator -c validator --tail=20
+```
+
+To pin a different image: `IMAGE=ghcr.io/dasmlab/fleet-validator:<tag> ./hack/render-bundle.sh`
+prints all three as one file.
+
+## CI and the lab deployment
+
+![fleet-validator deploy](diagrams/fleet-validator-deploy.svg)
+
+Every push to `main` runs vet and test, builds the image and pushes it to
+`ghcr.io/dasmlab/fleet-validator`, then commits plain manifests (`hack/render-envelope.sh`) to
+the lab GitOps repo `lmcdasm/dasmlab-live-cicd` under
+`clusters/2026-prod-1/fleet-validator/live/`, where Argo CD deploys them. 2026-prod-1 has no ACM:
+it proves the build-and-deploy pipeline, not the validation. The envelope contains the same
+objects the hub policy creates (extracted from it by `hack/envelope`), minus the dashboards.
+
+One-time Argo CD registration on the lab cluster:
+
+```bash
+OC_CONTEXT=<ctx> ./scripts/bootstrap-argocd.sh
 ```
 
 ## Grafana (ACM Observability)
@@ -261,7 +250,9 @@ SemVer tags. CI bumps the patch version on every push to `main` and claims the t
 workflow by hand with `minor` or `major` to draw a line. Images are tagged `vX.Y.Z-<sha>` on
 every build, and also `vX.Y.Z`, `X.Y.Z` and `latest` on `main`.
 
-To cut a tag locally (re-renders the policy so it pins the new tag):
+Cut releases with `commitme.sh`. It re-renders `deploy/acm/` to pin the new tag and pushes
+the commit and tag together, and CI then builds that exact version. A plain push also builds,
+but `deploy/acm/` keeps pinning the last release.
 
 ```bash
 ./commitme.sh point "short why message"

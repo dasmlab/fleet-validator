@@ -1,5 +1,9 @@
 direction: right
 
+repo: {
+  label: "dasmlab/fleet-validator\ndeploy/acm (pinned by commitme.sh)"
+  style.fill: "#EEF1F8"
+}
 gh: {
   label: "GitHub Actions\n(self-hosted runners)"
   style.fill: "#EEF1F8"
@@ -8,32 +12,49 @@ ghcr: {
   label: "ghcr.io/dasmlab/fleet-validator\n(public)"
   style.fill: "#EEF1F8"
 }
-live: {
-  label: "dasmlab-live-cicd\nclusters/2026-prod-1/fleet-validator/live"
-  style.fill: "#EEF1F8"
-}
-argo: {
-  label: "Argo CD\nApplication fleet-validator"
-  style.fill: "#E8F2F0"
-}
-policy: {
-  label: "ACM Policies\nopen-cluster-management-global-set"
-  style.fill: "#1f6f62"
-  style.font-color: "#FFFFFF"
-  style.bold: true
-}
-hubwl: {
-  label: "hub-fleet-validator → local-cluster\nNS · RBAC · Deployment · Service · Route\nServiceMonitor · allowlist · 2 dashboards"
-  style.fill: "#E8F2F0"
-}
-probes: {
-  label: "fleet-validator-spoke-probes\n→ every OpenShift managed cluster"
-  style.fill: "#E8F2F0"
+
+hub: {
+  label: "ACM hub"
+  style.fill: "#F7F9FC"
+  policy: {
+    label: "ACM Policies\nopen-cluster-management-global-set"
+    style.fill: "#1f6f62"
+    style.font-color: "#FFFFFF"
+    style.bold: true
+  }
+  hubwl: {
+    label: "hub-fleet-validator → local-cluster\nNS · RBAC · Deployment · Service · Route\nServiceMonitor · allowlist · 2 dashboards"
+    style.fill: "#E8F2F0"
+  }
+  probes: {
+    label: "fleet-validator-spoke-probes\n→ every OpenShift managed cluster"
+    style.fill: "#E8F2F0"
+  }
+  policy -> hubwl: "enforce"
+  policy -> probes: "inform"
 }
 
-gh -> ghcr: "image vX.Y.Z-sha"
-gh -> live: "bundle vX.Y.Z-sha.yaml"
-live -> argo: "sync"
-argo -> policy: "Policy + Placement"
-policy -> hubwl: "enforce"
-policy -> probes: "inform"
+lab: {
+  label: "Lab CI target (2026-prod-1, no ACM)"
+  style.fill: "#F7F9FC"
+  live: {
+    label: "dasmlab-live-cicd\nclusters/2026-prod-1/fleet-validator/live"
+    style.fill: "#EEF1F8"
+  }
+  argo: {
+    label: "Argo CD\nApplication fleet-validator"
+    style.fill: "#E8F2F0"
+  }
+  wl: {
+    label: "plain manifests\nNS · RBAC · Deployment · Service · Route"
+    style.fill: "#E8F2F0"
+  }
+  live -> argo: "sync"
+  argo -> wl: "apply"
+}
+
+repo -> gh: "push to main"
+gh -> ghcr: "image vX.Y.Z"
+repo -> hub.policy: "oc apply / hub GitOps"
+gh -> lab.live: "envelope vX.Y.Z-sha.yaml"
+hub.hubwl -> ghcr: "pull" {style.stroke-dash: 3}
