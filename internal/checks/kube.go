@@ -130,6 +130,18 @@ func findCond(conds []condition, typ string) (condition, bool) {
 	return condition{}, false
 }
 
+// summary formats a condition as "Type=Status Reason: message" for check details.
+func (c condition) summary() string {
+	s := c.Type + "=" + c.Status
+	if c.Reason != "" {
+		s += " " + c.Reason
+	}
+	if c.Message != "" {
+		s += ": " + c.Message
+	}
+	return s
+}
+
 func isTrue(conds []condition, typ string) bool {
 	c, ok := findCond(conds, typ)
 	return ok && c.Status == "True"

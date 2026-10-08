@@ -766,6 +766,210 @@
     },
     {
       "id": 12,
+      "type": "table",
+      "title": "Needs attention",
+      "description": "Every failing or warning check with the validator's reason. Click a Reason cell to see it in full; the section tables below have all checks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (group, check, title, severity) (fleetvalidator_check_state{managed_cluster=\"$hub\", cluster_type=\"hub\"}) >= 0 < 1",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (check, detail) (fleetvalidator_check_detail{managed_cluster=\"$hub\", cluster_type=\"hub\"} and on (check) (max by (check) (fleetvalidator_check_state{managed_cluster=\"$hub\", cluster_type=\"hub\"}) >= 0 < 1))",
+          "refId": "B",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value #B": true,
+              "check": true
+            },
+            "indexByName": {
+              "Value #A": 0,
+              "group": 1,
+              "title": 2,
+              "severity": 3,
+              "detail": 4
+            },
+            "renameByName": {
+              "Value #A": "Result",
+              "group": "Section",
+              "title": "Check",
+              "severity": "Severity",
+              "detail": "Reason"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "filterable": false
+          },
+          "noValue": "All checks passing"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Result"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "PASS",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "0.5": {
+                        "text": "WARN",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "0": {
+                        "text": "FAIL",
+                        "color": "red",
+                        "index": 2
+                      },
+                      "-1": {
+                        "text": "SKIP",
+                        "color": "text",
+                        "index": 3
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Section"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Check"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reason"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Result",
+            "desc": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
       "type": "timeseries",
       "title": "Hub score over time",
       "datasource": {
@@ -776,7 +980,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 17
       },
       "targets": [
         {
@@ -816,7 +1020,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "type": "timeseries",
       "title": "Managed cluster scores over time",
       "datasource": {
@@ -827,7 +1031,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 9
+        "y": 17
       },
       "targets": [
         {
@@ -867,7 +1071,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 15,
       "type": "row",
       "title": "Platform",
       "collapsed": false,
@@ -875,12 +1079,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 25
       },
       "panels": []
     },
     {
-      "id": 15,
+      "id": 16,
       "type": "table",
       "title": "Platform checks",
       "description": "OpenShift baseline: ClusterVersion, ClusterOperators, MachineConfigPools, nodes, CSRs, etcd, API latency.",
@@ -892,7 +1096,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "targets": [
         {
@@ -1035,6 +1239,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1050,7 +1273,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 17,
       "type": "row",
       "title": "ACM Hub",
       "collapsed": false,
@@ -1058,12 +1281,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 35
       },
       "panels": []
     },
     {
-      "id": 17,
+      "id": 18,
       "type": "table",
       "title": "ACM Hub checks",
       "description": "MultiClusterHub / MultiClusterEngine health, ACM operator CSV and hub pods.",
@@ -1075,7 +1298,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 36
       },
       "targets": [
         {
@@ -1218,6 +1441,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1233,7 +1475,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 19,
       "type": "row",
       "title": "Backup & DR",
       "collapsed": false,
@@ -1241,12 +1483,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 45
       },
       "panels": []
     },
     {
-      "id": 19,
+      "id": 20,
       "type": "table",
       "title": "Backup & DR checks",
       "description": "cluster-backup, OADP, BackupStorageLocation, BackupSchedule and the backup-restore-enabled policy.",
@@ -1258,7 +1500,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 46
       },
       "targets": [
         {
@@ -1401,6 +1643,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1416,7 +1677,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 21,
       "type": "row",
       "title": "Observability",
       "collapsed": false,
@@ -1424,12 +1685,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 55
       },
       "panels": []
     },
     {
-      "id": 21,
+      "id": 22,
       "type": "table",
       "title": "Observability checks",
       "description": "MultiClusterObservability, observability pods and User Workload Monitoring.",
@@ -1441,7 +1702,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 56
       },
       "targets": [
         {
@@ -1584,6 +1845,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1599,7 +1879,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 23,
       "type": "row",
       "title": "Governance",
       "collapsed": false,
@@ -1607,12 +1887,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 65
       },
       "panels": []
     },
     {
-      "id": 23,
+      "id": 24,
       "type": "table",
       "title": "Governance checks",
       "description": "Policies placed on the cluster: minimum OperatorPolicies / ConfigurationPolicies, all Compliant.",
@@ -1624,7 +1904,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 66
       },
       "targets": [
         {
@@ -1767,6 +2047,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1782,7 +2081,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 25,
       "type": "row",
       "title": "GitOps",
       "collapsed": false,
@@ -1790,12 +2089,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 67
+        "y": 75
       },
       "panels": []
     },
     {
-      "id": 25,
+      "id": 26,
       "type": "table",
       "title": "GitOps checks",
       "description": "Argo CD instances and Applications (the hub GitOps loop).",
@@ -1807,7 +2106,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "targets": [
         {
@@ -1950,6 +2249,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1965,7 +2283,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 27,
       "type": "row",
       "title": "Fleet",
       "collapsed": false,
@@ -1973,12 +2291,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 85
       },
       "panels": []
     },
     {
-      "id": 27,
+      "id": 28,
       "type": "table",
       "title": "Fleet checks",
       "description": "Hub view of every ManagedCluster, local-cluster add-ons and fleet-wide policy compliance.",
@@ -1990,7 +2308,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 86
       },
       "targets": [
         {
@@ -2133,6 +2451,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -2148,7 +2485,7 @@
       }
     },
     {
-      "id": 29,
+      "id": 30,
       "type": "row",
       "title": "Managed clusters",
       "collapsed": false,
@@ -2156,12 +2493,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 95
       },
       "panels": []
     },
     {
-      "id": 28,
+      "id": 29,
       "type": "table",
       "title": "Managed clusters",
       "description": "Every validated managed cluster. Open one in the Managed Cluster Validation dashboard.",
@@ -2173,7 +2510,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 96
       },
       "targets": [
         {

@@ -119,6 +119,10 @@ def row(ids, title, y, collapsed=False, panels=None):
             "gridPos": {"h": 1, "w": 24, "x": 0, "y": y}, "panels": panels or []}
 
 
+WRAP = [{"id": "custom.cellOptions", "value": {"type": "auto", "wrapText": True}},
+        {"id": "custom.inspect", "value": True}]
+
+
 def check_table(ids, group, sel, y, h=9):
     """Checklist table for one group: Result | Check | Severity | Detail, failures first."""
     g = f'group="{group}"'
@@ -149,6 +153,51 @@ def check_table(ids, group, sel, y, h=9):
                 ]},
                 {"matcher": {"id": "byName", "options": "Check"}, "properties": [{"id": "custom.width", "value": 380}]},
                 {"matcher": {"id": "byName", "options": "Severity"}, "properties": [{"id": "custom.width", "value": 100}]},
+                {"matcher": {"id": "byName", "options": "Detail"}, "properties": WRAP},
+            ],
+        },
+        "options": {"showHeader": True, "cellHeight": "sm",
+                    "sortBy": [{"displayName": "Result", "desc": False}]},
+    }
+
+
+def attention_table(ids, sel, y, h=8):
+    """Only FAIL and WARN checks, with the reason, so nobody has to open every section."""
+    bad = f"max by (check) (fleetvalidator_check_state{{{sel}}}) >= 0 < 1"
+    return {
+        "id": ids.next(), "type": "table", "title": "Needs attention",
+        "description": "Every failing or warning check with the validator's reason. "
+                       "Click a Reason cell to see it in full; the section tables below have all checks.",
+        "datasource": DS, "gridPos": {"h": h, "w": 24, "x": 0, "y": y},
+        "targets": [
+            target(f"max by (group, check, title, severity) (fleetvalidator_check_state{{{sel}}}) >= 0 < 1",
+                   "A", fmt="table"),
+            target(f"max by (check, detail) (fleetvalidator_check_detail{{{sel}}} and on (check) ({bad}))",
+                   "B", fmt="table"),
+        ],
+        "transformations": [
+            {"id": "merge", "options": {}},
+            {"id": "organize", "options": {
+                "excludeByName": {"Time": True, "Value #B": True, "check": True},
+                "indexByName": {"Value #A": 0, "group": 1, "title": 2, "severity": 3, "detail": 4},
+                "renameByName": {"Value #A": "Result", "group": "Section", "title": "Check",
+                                 "severity": "Severity", "detail": "Reason"},
+            }},
+        ],
+        "fieldConfig": {
+            "defaults": {"custom": {"align": "left", "filterable": False}, "noValue": "All checks passing"},
+            "overrides": [
+                {"matcher": {"id": "byName", "options": "Result"}, "properties": [
+                    {"id": "mappings", "value": STATE_MAPPINGS},
+                    {"id": "custom.width", "value": 80},
+                    {"id": "custom.align", "value": "center"},
+                    {"id": "custom.displayMode", "value": "color-background"},
+                    {"id": "custom.cellOptions", "value": {"type": "color-background"}},
+                ]},
+                {"matcher": {"id": "byName", "options": "Section"}, "properties": [{"id": "custom.width", "value": 140}]},
+                {"matcher": {"id": "byName", "options": "Check"}, "properties": [{"id": "custom.width", "value": 300}]},
+                {"matcher": {"id": "byName", "options": "Severity"}, "properties": [{"id": "custom.width", "value": 90}]},
+                {"matcher": {"id": "byName", "options": "Reason"}, "properties": WRAP},
             ],
         },
         "options": {"showHeader": True, "cellHeight": "sm",
@@ -218,12 +267,13 @@ def hub_dashboard():
     sel = 'managed_cluster="$hub", cluster_type="hub"'
     panels = [row(ids, "Overview", 0)]
     panels += overview(ids, sel, 1, extra_version=True)
+    panels.append(attention_table(ids, sel, 9))
     panels.append(timeseries(ids, "Hub score over time", f"max(fleetvalidator_cluster_score{{{sel}}})",
-                             "score", 0, 9, w=12))
+                             "score", 0, 17, w=12))
     panels.append(timeseries(ids, "Managed cluster scores over time",
                              'max by (managed_cluster) (fleetvalidator_cluster_score{cluster_type="managed"})',
-                             "{{managed_cluster}}", 12, 9, w=12))
-    y = 17
+                             "{{managed_cluster}}", 12, 17, w=12))
+    y = 25
     for g in HUB_GROUPS:
         panels.append(row(ids, g, y))
         panels.append(check_table(ids, g, sel, y + 1))
@@ -282,11 +332,12 @@ def managed_dashboard():
     sel = 'managed_cluster="$managed_cluster", cluster_type="managed"'
     panels = [row(ids, "Overview", 0)]
     panels += overview(ids, sel, 1, extra_version=False)
+    panels.append(attention_table(ids, sel, 9))
     panels.append(timeseries(ids, "Score over time", f"max(fleetvalidator_cluster_score{{{sel}}})",
-                             "score", 0, 9, w=12))
+                             "score", 0, 17, w=12))
     panels.append(timeseries(ids, "Section scores over time",
-                             f"max by (group) (fleetvalidator_group_score{{{sel}}})", "{{group}}", 12, 9, w=12))
-    y = 17
+                             f"max by (group) (fleetvalidator_group_score{{{sel}}})", "{{group}}", 12, 17, w=12))
+    y = 25
     for g in MANAGED_GROUPS:
         panels.append(row(ids, g, y))
         panels.append(check_table(ids, g, sel, y + 1))

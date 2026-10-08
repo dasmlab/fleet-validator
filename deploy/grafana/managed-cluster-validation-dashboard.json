@@ -703,6 +703,210 @@
     },
     {
       "id": 11,
+      "type": "table",
+      "title": "Needs attention",
+      "description": "Every failing or warning check with the validator's reason. Click a Reason cell to see it in full; the section tables below have all checks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (group, check, title, severity) (fleetvalidator_check_state{managed_cluster=\"$managed_cluster\", cluster_type=\"managed\"}) >= 0 < 1",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (check, detail) (fleetvalidator_check_detail{managed_cluster=\"$managed_cluster\", cluster_type=\"managed\"} and on (check) (max by (check) (fleetvalidator_check_state{managed_cluster=\"$managed_cluster\", cluster_type=\"managed\"}) >= 0 < 1))",
+          "refId": "B",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value #B": true,
+              "check": true
+            },
+            "indexByName": {
+              "Value #A": 0,
+              "group": 1,
+              "title": 2,
+              "severity": 3,
+              "detail": 4
+            },
+            "renameByName": {
+              "Value #A": "Result",
+              "group": "Section",
+              "title": "Check",
+              "severity": "Severity",
+              "detail": "Reason"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "filterable": false
+          },
+          "noValue": "All checks passing"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Result"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "PASS",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "0.5": {
+                        "text": "WARN",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "0": {
+                        "text": "FAIL",
+                        "color": "red",
+                        "index": 2
+                      },
+                      "-1": {
+                        "text": "SKIP",
+                        "color": "text",
+                        "index": 3
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Section"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Check"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reason"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Result",
+            "desc": false
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
       "type": "timeseries",
       "title": "Score over time",
       "datasource": {
@@ -713,7 +917,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 17
       },
       "targets": [
         {
@@ -753,7 +957,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 13,
       "type": "timeseries",
       "title": "Section scores over time",
       "datasource": {
@@ -764,7 +968,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 9
+        "y": 17
       },
       "targets": [
         {
@@ -804,7 +1008,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "type": "row",
       "title": "Registration",
       "collapsed": false,
@@ -812,12 +1016,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 25
       },
       "panels": []
     },
     {
-      "id": 14,
+      "id": 15,
       "type": "table",
       "title": "Registration checks",
       "description": "Hub-side view of the klusterlet: accepted, joined, available, import, clock, lease.",
@@ -829,7 +1033,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "targets": [
         {
@@ -972,6 +1176,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -987,7 +1210,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 16,
       "type": "row",
       "title": "Agents & Add-ons",
       "collapsed": false,
@@ -995,12 +1218,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 35
       },
       "panels": []
     },
     {
-      "id": 16,
+      "id": 17,
       "type": "table",
       "title": "Agents & Add-ons checks",
       "description": "Required add-ons present and Available; klusterlet agent deployments ready (probe).",
@@ -1012,7 +1235,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 36
       },
       "targets": [
         {
@@ -1155,6 +1378,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1170,7 +1412,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 18,
       "type": "row",
       "title": "Platform",
       "collapsed": false,
@@ -1178,12 +1420,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 45
       },
       "panels": []
     },
     {
-      "id": 18,
+      "id": 19,
       "type": "table",
       "title": "Platform checks",
       "description": "OpenShift baseline: ClusterVersion, ClusterOperators, MachineConfigPools, nodes, CSRs, etcd, API latency.",
@@ -1195,7 +1437,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 46
       },
       "targets": [
         {
@@ -1338,6 +1580,25 @@
                 "value": 100
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1353,7 +1614,7 @@
       }
     },
     {
-      "id": 19,
+      "id": 20,
       "type": "row",
       "title": "Governance",
       "collapsed": false,
@@ -1361,12 +1622,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 55
       },
       "panels": []
     },
     {
-      "id": 20,
+      "id": 21,
       "type": "table",
       "title": "Governance checks",
       "description": "Policies placed on the cluster: minimum OperatorPolicies / ConfigurationPolicies, all Compliant.",
@@ -1378,7 +1639,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 56
       },
       "targets": [
         {
@@ -1519,6 +1780,25 @@
               {
                 "id": "custom.width",
                 "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
               }
             ]
           }

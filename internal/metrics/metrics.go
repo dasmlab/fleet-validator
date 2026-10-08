@@ -5,6 +5,7 @@
 package metrics
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +25,7 @@ const (
 	lState    = "state"
 	lDetail   = "detail"
 
-	maxDetail = 180
+	maxDetail = 240
 )
 
 // Names lists every exported series name (for the MCO allowlist).
@@ -127,10 +128,11 @@ func (e *Exporter) SetClusterCounts(hub, managed int) {
 	e.clusters.WithLabelValues(string(checks.Managed)).Set(float64(managed))
 }
 
+// truncate makes a detail fit one dashboard cell: one line, at most maxDetail runes.
 func truncate(s string) string {
-	r := []rune(s)
+	r := []rune(strings.Join(strings.Fields(s), " "))
 	if len(r) <= maxDetail {
-		return s
+		return string(r)
 	}
 	return string(r[:maxDetail-1]) + "…"
 }

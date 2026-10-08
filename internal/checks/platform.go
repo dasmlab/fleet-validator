@@ -40,17 +40,23 @@ func checkClusterOperators(ctx context.Context, t *Target) (State, string) {
 		return skipOrFail(err, "ClusterOperators")
 	}
 	var bad, progressing []string
+	reasons := map[string]string{}
 	for _, co := range cos {
 		conds := conditions(co.Object)
 		switch {
-		case !isTrue(conds, "Available") || isTrue(conds, "Degraded"):
-			bad = append(bad, co.GetName())
+		case isTrue(conds, "Degraded"):
+			c, _ := findCond(conds, "Degraded")
+			bad, reasons[co.GetName()] = append(bad, co.GetName()), c.summary()
+		case !isTrue(conds, "Available"):
+			c, _ := findCond(conds, "Available")
+			bad, reasons[co.GetName()] = append(bad, co.GetName()), c.summary()
 		case isTrue(conds, "Progressing"):
 			progressing = append(progressing, co.GetName())
 		}
 	}
 	if len(bad) > 0 {
-		return Fail, fmt.Sprintf("%d unavailable/degraded: %s", len(bad), names(bad, 6))
+		d := fmt.Sprintf("%d unavailable/degraded: %s", len(bad), names(bad, 6))
+		return Fail, d + " | " + bad[0] + " " + reasons[bad[0]]
 	}
 	if len(progressing) > 0 {
 		return Warn, fmt.Sprintf("%d progressing: %s", len(progressing), names(progressing, 6))
@@ -64,17 +70,22 @@ func checkMCP(ctx context.Context, t *Target) (State, string) {
 		return skipOrFail(err, "MachineConfigPools")
 	}
 	var degraded, updating []string
+	reason := ""
 	for _, p := range pools {
 		conds := conditions(p.Object)
 		switch {
 		case isTrue(conds, "Degraded"):
 			degraded = append(degraded, p.GetName())
+			if reason == "" {
+				c, _ := findCond(conds, "Degraded")
+				reason = p.GetName() + " " + c.summary()
+			}
 		case !isTrue(conds, "Updated"):
 			updating = append(updating, p.GetName())
 		}
 	}
 	if len(degraded) > 0 {
-		return Fail, "degraded: " + names(degraded, 6)
+		return Fail, "degraded: " + names(degraded, 6) + " | " + reason
 	}
 	if len(updating) > 0 {
 		return Warn, "updating: " + names(updating, 6)

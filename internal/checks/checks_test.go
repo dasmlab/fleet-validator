@@ -232,4 +232,20 @@ func TestClusterOperators(t *testing.T) {
 	if st, d := checkClusterOperators(context.Background(), tg); st != Warn || !strings.Contains(d, "ingress") {
 		t.Errorf("got %s %q", st, d)
 	}
+	tg = newTarget(t, "local-cluster", Hub, nil, nil,
+		co("dns", "Available", "True", "Degraded", "False"),
+		co("storage", "Available", "True", "Degraded", "True"),
+	)
+	if st, d := checkClusterOperators(context.Background(), tg); st != Fail || !strings.HasSuffix(d, "| storage Degraded=True R: m") {
+		t.Errorf("degraded: %s %q", st, d)
+	}
+}
+
+func TestMCOReason(t *testing.T) {
+	mco := obj("observability.open-cluster-management.io/v1beta2", "MultiClusterObservability", "", "observability",
+		map[string]any{"status": map[string]any{"conditions": conds("Ready", "False", "Failed", "True")}})
+	tg := newTarget(t, "local-cluster", Hub, nil, nil, mco)
+	if st, d := checkMCO(context.Background(), tg); st != Fail || d != "not Ready, Failed=True R: m" {
+		t.Errorf("got %s %q", st, d)
+	}
 }

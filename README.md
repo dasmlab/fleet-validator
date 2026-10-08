@@ -217,6 +217,10 @@ Both dashboards land in the **Fleet-validator** folder:
 | ACM Hub Validation | `acm-hub-validation-dashboard` | Hub score, READY, group scores, one table per group, and a fleet table linking to each managed cluster |
 | Managed Cluster Validation | `managed-cluster-validation-dashboard` | Same layout for one managed cluster, picked from the cluster dropdown |
 
+Under the overview tiles, the **Needs attention** table lists only the FAIL and WARN checks with
+the validator's reason (condition reason and message, the offending objects). Reasons are one line
+and capped at 240 characters; click a cell to see it in full, or use `/api/v1/clusters/{name}` for the untruncated text.
+
 The MCO `grafana-dashboard-loader` imports any ConfigMap in
 `open-cluster-management-observability` labelled `grafana-custom-dashboard: "true"`; the folder
 comes from the annotation `observability.open-cluster-management.io/dashboard-folder`. Queries use

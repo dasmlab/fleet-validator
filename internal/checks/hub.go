@@ -207,10 +207,15 @@ func checkMCO(ctx context.Context, t *Target) (State, string) {
 	if isTrue(conds, "Ready") {
 		return Pass, items[0].GetName() + " Ready"
 	}
-	if c, ok := findCond(conds, "Degraded"); ok && c.Status == "True" {
-		return Fail, "Degraded: " + c.Message
+	for _, typ := range []string{"Failed", "Degraded", "Installing"} {
+		if c, ok := findCond(conds, typ); ok && c.Status == "True" {
+			return Fail, "not Ready, " + c.summary()
+		}
 	}
-	return Fail, "not Ready"
+	if c, ok := findCond(conds, "Ready"); ok {
+		return Fail, c.summary()
+	}
+	return Fail, "not Ready (no conditions reported)"
 }
 
 func checkObservabilityPods(ctx context.Context, t *Target) (State, string) {
@@ -249,12 +254,16 @@ func checkArgoApps(field string) func(context.Context, *Target) (State, string) 
 			return Skip, "no Applications"
 		}
 		var bad, soft []string
+		reason := ""
 		for _, a := range apps {
 			n := a.GetNamespace() + "/" + a.GetName()
 			switch field {
 			case "sync":
 				if s := nestedStr(a.Object, "status", "sync", "status"); s != "Synced" {
 					bad = append(bad, fmt.Sprintf("%s(%s)", n, s))
+					if m := nestedStr(a.Object, "status", "operationState", "message"); reason == "" && m != "" {
+						reason = a.GetName() + ": " + m
+					}
 				}
 			case "health":
 				switch s := nestedStr(a.Object, "status", "health", "status"); s {
@@ -263,11 +272,18 @@ func checkArgoApps(field string) func(context.Context, *Target) (State, string) 
 					soft = append(soft, fmt.Sprintf("%s(%s)", n, s))
 				default:
 					bad = append(bad, fmt.Sprintf("%s(%s)", n, s))
+					if m := nestedStr(a.Object, "status", "health", "message"); reason == "" && m != "" {
+						reason = a.GetName() + ": " + m
+					}
 				}
 			}
 		}
 		if len(bad) > 0 {
-			return Fail, fmt.Sprintf("%d/%d: %s", len(bad), len(apps), names(bad, 4))
+			d := fmt.Sprintf("%d/%d: %s", len(bad), len(apps), names(bad, 4))
+			if reason != "" {
+				d += " | " + reason
+			}
+			return Fail, d
 		}
 		if len(soft) > 0 {
 			return Warn, fmt.Sprintf("%d/%d: %s", len(soft), len(apps), names(soft, 4))
